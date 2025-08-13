@@ -61,7 +61,14 @@ Useful for formatters that modify the current file."
                          (file-exists-p current-file)
                          (buffer-live-p current-buffer))
                 (with-current-buffer current-buffer
-                  (revert-buffer t t t)))))
+                  (let ((point (point))
+                        (window-start (window-start)))
+                    (message "Reloading buffer: %s" (buffer-name))
+                    (revert-buffer t t t)
+                    ;; Restore cursor position and window position
+                    (goto-char point)
+                    (set-window-start (selected-window) window-start)
+                    (message "Buffer reloaded"))))))
         ;; Run asynchronously
         (if project-on-save-command-show-output
             (let ((buffer (get-buffer-create process-name)))
