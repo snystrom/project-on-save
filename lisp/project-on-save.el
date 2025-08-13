@@ -79,7 +79,7 @@ Useful for formatters that modify the current file."
                process-name buffer command))
           ;; Run silently
           (start-process-shell-command
-           process-name nil command)))))
+           process-name nil command))))))
 
 (defun project-on-save-command--after-save-hook ()
   "Hook function to run registered command after save."
