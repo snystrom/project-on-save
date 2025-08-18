@@ -23,6 +23,12 @@
   :type 'boolean
   :group 'project-on-save-command)
 
+(defcustom project-on-save-command-run-synchronously nil
+  "Whether to run commands synchronously and reload buffer from disk when complete.
+Useful for formatters that modify the current file."
+  :type 'boolean
+  :group 'project-on-save-command)
+
 (defvar-local project-on-save-command--registered-command nil
   "The command registered for this buffer.")
 
@@ -39,17 +45,34 @@
   "Run COMMAND in the project directory."
   (when-let ((project-root (project-on-save-command--get-project-root)))
     (let ((default-directory project-root)
-          (process-name (format "*project-on-save: %s*" (file-name-nondirectory project-root))))
-      (if project-on-save-command-show-output
-          (let ((buffer (get-buffer-create process-name)))
-            (with-current-buffer buffer
-              (erase-buffer)
-              (insert (format "Running: %s\nIn: %s\n\n" command project-root)))
-            (start-process-shell-command
-             process-name buffer command))
-        ;; Run silently
-        (start-process-shell-command
-         process-name nil command)))))
+          (process-name (format "*project-on-save: %s*" (file-name-nondirectory project-root)))
+          (current-buffer (current-buffer))
+          (current-file (buffer-file-name)))
+      (if project-on-save-command-run-synchronously
+          ;; Run synchronously and reload buffer
+          (progn
+            (when project-on-save-command-show-output
+              (message "Running: %s..." command))
+            (let ((result (shell-command command)))
+              (when project-on-save-command-show-output
+                (message "Command finished with exit code: %d" result))
+              ;; Reload the current buffer from disk if it's a file buffer
+              (when (and current-file
+                         (file-exists-p current-file)
+                         (buffer-live-p current-buffer))
+                (with-current-buffer current-buffer
+                  (revert-buffer t t t)))))
+        ;; Run asynchronously
+        (if project-on-save-command-show-output
+            (let ((buffer (get-buffer-create process-name)))
+              (with-current-buffer buffer
+                (erase-buffer)
+                (insert (format "Running: %s\nIn: %s\n\n" command project-root)))
+              (start-process-shell-command
+               process-name buffer command))
+          ;; Run silently
+          (start-process-shell-command
+           process-name nil command)))))
 
 (defun project-on-save-command--after-save-hook ()
   "Hook function to run registered command after save."
